@@ -71,11 +71,9 @@ def vertical_smear(binary):
     print 'vertical_smear finish'
 
 
-def find_connected_block(img_path):
-    img = cv2.imread(img_path)
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    ret, binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
-    contours, hierarchy = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+def find_connected_block(binary):
+    img = np.array(binary * 255, dtype=np.uint8)
+    contours, hierarchy = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     result = []
     for i, h in enumerate(hierarchy[0]):
         if h[3] == 0:      # parent is page
@@ -128,11 +126,11 @@ out_path2 = './camera/0001.layout2.png'
 binary = ocrolib.read_image_binary(img_path)
 horizontal_smear(binary)
 vertical_smear(binary)
-ocrolib.write_image_binary(out_path, binary)
+ocrolib.write_image_binary(out_path, binary)    # if debug
 
-boxes = find_connected_block(out_path)
+boxes = find_connected_block(binary)
 union_boxes = merge_overlap_boxes(boxes)
-draw_layouts(img_path, union_boxes, out_path2)
+draw_layouts(img_path, union_boxes, out_path2)  # if debug
 
 
 print 'finish.'
