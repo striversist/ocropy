@@ -1,6 +1,7 @@
 import numpy as np
 import ocrolib
 import cv2
+import time
 
 
 def overlap(x1, w1, x2, w2):
@@ -46,7 +47,6 @@ def horizontal_smear(binary):
                 one_flag = 1
             else:                   # white
                 zero_count += 1
-    print 'horizontal_smear finish'
 
 
 def vertical_smear(binary):
@@ -68,7 +68,6 @@ def vertical_smear(binary):
                 one_flag = 1
             else:
                 zero_count += 1
-    print 'vertical_smear finish'
 
 
 def find_connected_block(binary):
@@ -109,7 +108,6 @@ def merge_overlap_boxes(boxes):
 
 
 def draw_layouts(input_path, boxes, output_path):
-    print 'draw_layouts...'
     img = cv2.imread(input_path)
     for box in boxes:
         x = box[0]
@@ -121,16 +119,35 @@ def draw_layouts(input_path, boxes, output_path):
 
 
 img_path = './camera/0001.bin.png'
-out_path = './camera/0001.layout.png'
-out_path2 = './camera/0001.layout2.png'
+binary_path = './camera/0001.layout.png'
+final_path = './camera/0001.layout2.png'
+
+start_time = time.time()
+prev_time = start_time
+
+# Step1: read image and convert to binary
 binary = ocrolib.read_image_binary(img_path)
+print 'read image: {:.3f}s'.format(time.time() - prev_time)
+prev_time = time.time()
+
+# Step2: Run-Length Smearing Algorithm
 horizontal_smear(binary)
+print 'horizontal_smear: {:.3f}s'.format(time.time() - prev_time)
+prev_time = time.time()
 vertical_smear(binary)
-ocrolib.write_image_binary(out_path, binary)    # if debug
+print 'vertical_smear: {:.3f}s'.format(time.time() - prev_time)
+prev_time = time.time()
+ocrolib.write_image_binary(binary_path, binary)    # if debug
 
+# Step3: Find connected area
 boxes = find_connected_block(binary)
+print 'find connected block: {:.3f}s'.format(time.time() - prev_time)
+prev_time = time.time()
+
+# Step4: Merge overlapped boxes
 union_boxes = merge_overlap_boxes(boxes)
-draw_layouts(img_path, union_boxes, out_path2)  # if debug
+print 'merge overlap boxes: {:.3f}s'.format(time.time() - prev_time)
+draw_layouts(img_path, union_boxes, final_path)  # if debug
 
-
+print 'totally take: {:.3f}s'.format(time.time() - start_time)
 print 'finish.'
