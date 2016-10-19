@@ -110,7 +110,7 @@ def draw_layouts(input_path, boxes, output_path):
 img_path = './camera/0001.bin.png'
 binary_path = './camera/0001.layout.png'
 final_path = './camera/0001.layout2.png'
-temp_shape = (1920, 1080)
+temp_shape = (1440, 1080)
 
 
 start_time = time.time()
@@ -131,7 +131,7 @@ prev_time = time.time()
 
 # Step3: Estimate character scale
 character_scale = psegutils.estimate_scale(binary)
-print 'character_scale: {:.3f}s result({})'.format(time.time() - prev_time, character_scale)
+print 'character_scale: {:.3f} {:.3f}s'.format(character_scale, time.time() - prev_time)
 prev_time = time.time()
 
 # Step4: Run-Length Smearing Algorithm
