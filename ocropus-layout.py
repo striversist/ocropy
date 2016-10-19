@@ -135,6 +135,7 @@ print 'character_scale: {:.3f} {:.3f}s'.format(character_scale, time.time() - pr
 prev_time = time.time()
 
 # Step4: Run-Length Smearing Algorithm
+assert character_scale > 0
 horizontal_smear(binary, int(round(character_scale * 3)))
 print 'horizontal_smear: {:.3f}s'.format(time.time() - prev_time)
 prev_time = time.time()
