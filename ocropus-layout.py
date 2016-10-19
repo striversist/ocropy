@@ -2,6 +2,7 @@ import numpy as np
 import ocrolib
 import cv2
 import time
+import scipy.misc
 
 
 def overlap(x1, w1, x2, w2):
@@ -29,7 +30,7 @@ def box_union(box1, box2):
 
 
 def horizontal_smear(binary):
-    hor_thres = 40
+    hor_thres = 20
     zero_count = 0
     one_flag = 0
     for i in range(binary.shape[0]):
@@ -50,7 +51,7 @@ def horizontal_smear(binary):
 
 
 def vertical_smear(binary):
-    ver_thres = 45
+    ver_thres = 30
     zero_count = 0
     one_flag = 0
     for i in range(binary.shape[1]):
@@ -79,32 +80,21 @@ def find_connected_block(binary):
             # cv2.drawContours(img, contours, i, (0, 0, 255), 3)
             x, y, w, h = cv2.boundingRect(contours[i])
             # cv2.rectangle(img, (x, y), (x + w, y + h), (0, 0, 255), 3)
-            result.append((x, y, w, h))
+            if w > 20 and h > 20:   # ignore too small
+                result.append((x, y, w, h))
     print 'find_connected_block: {}'.format(len(result))
     return result
 
 
-def merge_overlap_boxes(boxes):
-    union_boxes = []
-    found_overlap = False
-    while True:
-        for i, box1 in enumerate(boxes):
-            union_box = box1
-            for box2 in boxes[i + 1:]:
-                if is_overlap(box1, box2):
-                    union_box = box_union(box1, box2)
-                    found_overlap = True
-                    break
-            if union_box not in union_boxes:
-                union_boxes.append(union_box)
-        if found_overlap:   # prepare next loop
-            boxes = union_boxes
-            union_boxes = []
-            found_overlap = False
-        else:   # no overlap anymore
-            break
-    print 'merge_overlap_boxes: union_boxes({})'.format(len(union_boxes))
-    return union_boxes
+def resize_boxes(boxes, ratio_v, ratio_h):
+    result = []
+    for box in boxes:
+        x = int(box[0] * ratio_h)
+        y = int(box[1] * ratio_v)
+        w = int(box[2] * ratio_h)
+        h = int(box[3] * ratio_v)
+        result.append((x, y, w, h))
+    return result
 
 
 def draw_layouts(input_path, boxes, output_path):
@@ -121,33 +111,41 @@ def draw_layouts(input_path, boxes, output_path):
 img_path = './camera/0001.bin.png'
 binary_path = './camera/0001.layout.png'
 final_path = './camera/0001.layout2.png'
+temp_shape = (1920, 1080)
+
 
 start_time = time.time()
 prev_time = start_time
 
 # Step1: read image and convert to binary
-binary = ocrolib.read_image_binary(img_path)
+gray_image = ocrolib.read_image_gray(img_path)
 print 'read image: {:.3f}s'.format(time.time() - prev_time)
 prev_time = time.time()
 
-# Step2: Run-Length Smearing Algorithm
+# Step2: Resize to temp size for speeding up next processes
+ratio_vertical = gray_image.shape[0] * 1.0 / temp_shape[0]
+ratio_horizontal = gray_image.shape[1] * 1.0 / temp_shape[1]
+gray_image = scipy.misc.imresize(gray_image, temp_shape)
+binary = ocrolib.binarize_range(gray_image, dtype='i')
+
+# Step3: Run-Length Smearing Algorithm
 horizontal_smear(binary)
 print 'horizontal_smear: {:.3f}s'.format(time.time() - prev_time)
 prev_time = time.time()
 vertical_smear(binary)
 print 'vertical_smear: {:.3f}s'.format(time.time() - prev_time)
 prev_time = time.time()
-ocrolib.write_image_binary(binary_path, binary)    # if debug
+ocrolib.write_image_binary(binary_path, binary)     # if debug
 
-# Step3: Find connected area
+# Step4: Find connected area
 boxes = find_connected_block(binary)
 print 'find connected block: {:.3f}s'.format(time.time() - prev_time)
 prev_time = time.time()
 
-# Step4: Merge overlapped boxes
-union_boxes = merge_overlap_boxes(boxes)
-print 'merge overlap boxes: {:.3f}s'.format(time.time() - prev_time)
-draw_layouts(img_path, union_boxes, final_path)  # if debug
+# Step5: Resize boxes to original ratio
+boxes = resize_boxes(boxes, ratio_v=ratio_vertical, ratio_h=ratio_horizontal)
+print 'resize boxes: {:.3f}s'.format(time.time() - prev_time)
+draw_layouts(img_path, boxes, final_path)           # if debug
 
 print 'totally take: {:.3f}s'.format(time.time() - start_time)
 print 'finish.'
