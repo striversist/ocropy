@@ -3,6 +3,7 @@ import ocrolib
 import cv2
 import time
 import scipy.misc
+from ocrolib import psegutils
 
 
 def overlap(x1, w1, x2, w2):
@@ -29,8 +30,7 @@ def box_union(box1, box2):
     return x, y, w, h
 
 
-def horizontal_smear(binary):
-    hor_thres = 20
+def horizontal_smear(binary, horizontal_threshold=20):
     zero_count = 0
     one_flag = 0
     for i in range(binary.shape[0]):
@@ -38,7 +38,7 @@ def horizontal_smear(binary):
             val = binary[i][j]
             if val == 0:            # black
                 if one_flag == 1:
-                    if zero_count <= hor_thres:
+                    if zero_count <= horizontal_threshold:
                         binary[i][j] = 0
                         for n in range(j - zero_count, j):
                             binary[i][n] = 0
@@ -50,8 +50,7 @@ def horizontal_smear(binary):
                 zero_count += 1
 
 
-def vertical_smear(binary):
-    ver_thres = 30
+def vertical_smear(binary, vertical_threshold=30):
     zero_count = 0
     one_flag = 0
     for i in range(binary.shape[1]):
@@ -59,7 +58,7 @@ def vertical_smear(binary):
             val = binary[j][i]
             if val == 0:
                 if one_flag == 1:
-                    if zero_count <= ver_thres:
+                    if zero_count <= vertical_threshold:
                         binary[j][i] = 0
                         for n in range(j - zero_count, j):
                             binary[n][i] = 0
@@ -127,22 +126,29 @@ ratio_vertical = gray_image.shape[0] * 1.0 / temp_shape[0]
 ratio_horizontal = gray_image.shape[1] * 1.0 / temp_shape[1]
 gray_image = scipy.misc.imresize(gray_image, temp_shape)
 binary = ocrolib.binarize_range(gray_image, dtype='i')
+print 'resize and binarize: {:.3f}s'.format(time.time() - prev_time)
+prev_time = time.time()
 
-# Step3: Run-Length Smearing Algorithm
-horizontal_smear(binary)
+# Step3: Estimate character scale
+character_scale = psegutils.estimate_scale(binary)
+print 'character_scale: {:.3f}s result({})'.format(time.time() - prev_time, character_scale)
+prev_time = time.time()
+
+# Step4: Run-Length Smearing Algorithm
+horizontal_smear(binary, int(round(character_scale * 3)))
 print 'horizontal_smear: {:.3f}s'.format(time.time() - prev_time)
 prev_time = time.time()
-vertical_smear(binary)
+vertical_smear(binary, int(round(character_scale * 3)))
 print 'vertical_smear: {:.3f}s'.format(time.time() - prev_time)
 prev_time = time.time()
 ocrolib.write_image_binary(binary_path, binary)     # if debug
 
-# Step4: Find connected area
+# Step5: Find connected area
 boxes = find_connected_block(binary)
 print 'find connected block: {:.3f}s'.format(time.time() - prev_time)
 prev_time = time.time()
 
-# Step5: Resize boxes to original ratio
+# Step6: Resize boxes to original ratio
 boxes = resize_boxes(boxes, ratio_v=ratio_vertical, ratio_h=ratio_horizontal)
 print 'resize boxes: {:.3f}s'.format(time.time() - prev_time)
 draw_layouts(img_path, boxes, final_path)           # if debug
