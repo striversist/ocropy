@@ -4,6 +4,21 @@ import cv2
 import time
 import scipy.misc
 from ocrolib import psegutils
+import argparse
+import sys
+import os
+
+
+parser = argparse.ArgumentParser("""
+Image layout using Run-Length Smearing Algorithm.
+""")
+parser.add_argument('files', nargs='+')
+parser.add_argument('-d', '--debug', action="store_true", help='display intermediate results')
+args = parser.parse_args()
+args.files = ocrolib.glob_all(args.files)
+if len(args.files) < 1:
+    parser.print_help()
+    sys.exit(0)
 
 
 def overlap(x1, w1, x2, w2):
@@ -107,52 +122,52 @@ def draw_layouts(input_path, boxes, output_path):
     cv2.imwrite(output_path, img)
 
 
-img_path = './camera/0001.bin.png'
-binary_path = './camera/0001.layout.png'
-final_path = './camera/0001.layout2.png'
-temp_shape = (1440, 1080)
-
-
 start_time = time.time()
-prev_time = start_time
+for img_path in args.files:
+    img_start_time = prev_time = time.time()
+    base_path = os.path.splitext(img_path)[0]
+    inter_shape = (1440, 1080)
 
-# Step1: read image and convert to binary
-gray_image = ocrolib.read_image_gray(img_path)
-print 'read image: {:.3f}s'.format(time.time() - prev_time)
-prev_time = time.time()
+    # Step1: read image and convert to binary
+    gray_image = ocrolib.read_image_gray(img_path)
+    print 'read image: {:.3f}s'.format(time.time() - prev_time)
+    prev_time = time.time()
 
-# Step2: Resize to temp size for speeding up next processes
-ratio_vertical = gray_image.shape[0] * 1.0 / temp_shape[0]
-ratio_horizontal = gray_image.shape[1] * 1.0 / temp_shape[1]
-gray_image = scipy.misc.imresize(gray_image, temp_shape)
-binary = ocrolib.binarize_range(gray_image, dtype='i')
-print 'resize and binarize: {:.3f}s'.format(time.time() - prev_time)
-prev_time = time.time()
+    # Step2: Resize to temp size for speeding up next processes
+    ratio_vertical = gray_image.shape[0] * 1.0 / inter_shape[0]
+    ratio_horizontal = gray_image.shape[1] * 1.0 / inter_shape[1]
+    gray_image = scipy.misc.imresize(gray_image, inter_shape)
+    binary = ocrolib.binarize_range(gray_image, dtype='i')
+    print 'resize and binarize: {:.3f}s'.format(time.time() - prev_time)
+    prev_time = time.time()
 
-# Step3: Estimate character scale
-character_scale = psegutils.estimate_scale(binary)
-print 'character_scale: {:.3f} {:.3f}s'.format(character_scale, time.time() - prev_time)
-prev_time = time.time()
+    # Step3: Estimate character scale
+    character_scale = psegutils.estimate_scale(binary)
+    print 'character_scale: {:.3f} {:.3f}s'.format(character_scale, time.time() - prev_time)
+    prev_time = time.time()
 
-# Step4: Run-Length Smearing Algorithm
-assert character_scale > 0
-horizontal_smear(binary, int(round(character_scale * 3)))
-print 'horizontal_smear: {:.3f}s'.format(time.time() - prev_time)
-prev_time = time.time()
-vertical_smear(binary, int(round(character_scale * 3)))
-print 'vertical_smear: {:.3f}s'.format(time.time() - prev_time)
-prev_time = time.time()
-ocrolib.write_image_binary(binary_path, binary)     # if debug
+    # Step4: Run-Length Smearing Algorithm
+    assert character_scale > 0
+    horizontal_smear(binary, int(round(character_scale * 3)))
+    print 'horizontal_smear: {:.3f}s'.format(time.time() - prev_time)
+    prev_time = time.time()
+    vertical_smear(binary, int(round(character_scale * 3)))
+    print 'vertical_smear: {:.3f}s'.format(time.time() - prev_time)
+    prev_time = time.time()
+    if args.debug:
+        ocrolib.write_image_binary(base_path + ".binary.png", binary)
 
-# Step5: Find connected area
-boxes = find_connected_block(binary)
-print 'find connected block: {:.3f}s'.format(time.time() - prev_time)
-prev_time = time.time()
+    # Step5: Find connected area
+    boxes = find_connected_block(binary)
+    print 'find connected block: {:.3f}s'.format(time.time() - prev_time)
+    prev_time = time.time()
 
-# Step6: Resize boxes to original ratio
-boxes = resize_boxes(boxes, ratio_v=ratio_vertical, ratio_h=ratio_horizontal)
-print 'resize boxes: {:.3f}s'.format(time.time() - prev_time)
-draw_layouts(img_path, boxes, final_path)           # if debug
-
-print 'totally take: {:.3f}s'.format(time.time() - start_time)
+    # Step6: Resize boxes to original ratio
+    boxes = resize_boxes(boxes, ratio_v=ratio_vertical, ratio_h=ratio_horizontal)
+    print 'resize boxes: {:.3f}s'.format(time.time() - prev_time)
+    prev_time = time.time()
+    if args.debug:
+        draw_layouts(img_path, boxes, base_path + ".boxes.png")
+    print 'took: {:.3f}s \n'.format(time.time() - img_start_time)
+print 'totally took: {:.3f}s'.format(time.time() - start_time)
 print 'finish.'
