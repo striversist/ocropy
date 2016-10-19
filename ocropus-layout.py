@@ -73,14 +73,14 @@ def vertical_smear(binary):
 
 def find_connected_block(binary):
     img = np.array(binary * 255, dtype=np.uint8)
-    contours, hierarchy = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours, hierarchy = cv2.findContours(img, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
     result = []
     for i, h in enumerate(hierarchy[0]):
-        if h[3] == 0:      # parent is page
+        if h[3] != -1:      # no child
             # cv2.drawContours(img, contours, i, (0, 0, 255), 3)
             x, y, w, h = cv2.boundingRect(contours[i])
             # cv2.rectangle(img, (x, y), (x + w, y + h), (0, 0, 255), 3)
-            if w > 20 and h > 20:   # ignore too small
+            if w > 10 and h > 10:   # ignore too small
                 result.append((x, y, w, h))
     print 'find_connected_block: {}'.format(len(result))
     return result
